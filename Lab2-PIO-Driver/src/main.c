@@ -71,7 +71,14 @@
 #define LED2_PIO_IDX_MASK  (1u << LED2_PIO_IDX)
 #define LED3_PIO_IDX_MASK  (1u << LED3_PIO_IDX)
 
-
+/*  Default pin configuration (no attribute). */
+#define _PIO_DEFAULT             (0u << 0)
+/*  The internal pin pull-up is active. */
+#define _PIO_PULLUP              (1u << 0)
+/*  The internal glitch filter is active. */
+#define _PIO_DEGLITCH            (1u << 1)
+/*  The internal debouncing filter is active. */
+#define _PIO_DEBOUNCE            (1u << 3)
 
 
 
@@ -96,6 +103,98 @@ void init(void);
 /************************************************************************/
 /* funcoes                                                              */
 /************************************************************************/
+void _pio_set(Pio *p_pio, const uint32_t ul_mask)
+{
+	p_pio->PIO_SODR = ul_mask;
+}
+
+
+void _pio_clear(Pio *p_pio, const uint32_t ul_mask)
+{
+	p_pio->PIO_CODR = ul_mask;
+}
+
+void _pio_pull_up(Pio *p_pio, const uint32_t ul_mask, const uint32_t ul_pull_up_enable){
+	
+	if (ul_pull_up_enable){
+		p_pio->PIO_PUER = ul_mask;
+	}
+	else {
+		p_pio->PIO_PUDR = ul_mask;
+	}
+}
+
+void _pio_set_input(Pio *p_pio, const uint32_t ul_mask,
+const uint32_t ul_attribute)
+{
+	if (ul_attribute && PIO_DEGLITCH ) {
+		p_pio->PIO_IFSCDR = ul_mask;
+	}
+	
+	else {
+		p_pio->PIO_IFSCER = ul_mask;
+	}
+}
+
+void _pio_set_output(Pio *p_pio, const uint32_t ul_mask,
+const uint32_t ul_default_level,
+const uint32_t ul_multidrive_enable,
+const uint32_t ul_pull_up_enable)
+{
+	if (ul_default_level) {
+		_pio_set(p_pio,ul_mask);
+	}
+	
+	else {
+		_pio_clear(p_pio,ul_mask);
+	}
+	
+	if (ul_multidrive_enable) {
+		p_pio->PIO_MDER = ul_mask ;
+	}
+	
+	else {
+		p_pio->PIO_MDDR = ul_mask ;
+	}
+	p_pio->PIO_PER = ul_mask ;
+	p_pio->PIO_OER = ul_mask ;
+	
+	_pio_pull_up(p_pio,ul_mask,ul_pull_up_enable);
+
+}
+
+
+
+uint32_t _pio_get(Pio *p_pio, const pio_type_t ul_type,
+const uint32_t ul_mask)
+{
+	uint32_t input_output_mask;
+
+	if ( ul_type == PIO_OUTPUT_0 ) {
+		
+		input_output_mask = p_pio->PIO_ODSR;
+		
+		} 
+
+	else if (ul_type == PIO_INPUT) {
+		input_output_mask = p_pio->PIO_PDSR;
+	}
+
+	if ((input_output_mask & ul_mask) == 0) {
+		return 0;
+		} 
+	
+	else {
+		return 1;
+	}
+}
+
+void _delay_ms(int n) {
+	
+	for (int i =0; i < 150000*n;i++) {
+		asm("NOP");
+	}
+}
 
 // Função de inicialização do uC
 void init(void)
@@ -122,23 +221,18 @@ void init(void)
 	pmc_enable_periph_clk(BUT3_PIO_ID);
 	
 	//Inicializa PC8 como saída
-	pio_set_output(LED_PIO, LED_PIO_IDX_MASK, 0, 0, 0);
-	pio_set_output(LED1_PIO, LED1_PIO_IDX_MASK, 0, 0, 0);
-	pio_set_output(LED2_PIO, LED2_PIO_IDX_MASK, 0, 0, 0);
-	pio_set_output(LED3_PIO, LED3_PIO_IDX_MASK, 0, 0, 0);
+	_pio_set_output(LED_PIO, LED_PIO_IDX_MASK, 0, 0, 0);
+	_pio_set_output(LED1_PIO, LED1_PIO_IDX_MASK, 0, 0, 0);
+	_pio_set_output(LED2_PIO, LED2_PIO_IDX_MASK, 0, 0, 0);
+	_pio_set_output(LED3_PIO, LED3_PIO_IDX_MASK, 0, 0, 0);
 	
 	
 	// configura pino ligado ao botão como entrada com um pull-up.
-	pio_set_input(BUT_PIO, BUT_PIO_IDX_MASK,PIO_DEFAULT);
-	pio_set_input(BUT1_PIO, BUT1_PIO_IDX_MASK,PIO_DEFAULT);
-	pio_set_input(BUT2_PIO, BUT2_PIO_IDX_MASK,PIO_DEFAULT);
-	pio_set_input(BUT3_PIO, BUT3_PIO_IDX_MASK,PIO_DEFAULT);
+	_pio_set_input(BUT_PIO, BUT_PIO_IDX_MASK, _PIO_PULLUP | _PIO_DEBOUNCE);
+	_pio_set_input(BUT1_PIO, BUT1_PIO_IDX_MASK, _PIO_PULLUP | _PIO_DEBOUNCE);
+	_pio_set_input(BUT2_PIO, BUT2_PIO_IDX_MASK, _PIO_PULLUP | _PIO_DEBOUNCE);
+	_pio_set_input(BUT3_PIO, BUT3_PIO_IDX_MASK, _PIO_PULLUP | _PIO_DEBOUNCE);
 	
-	// Ativa o pull-up no PIO
-	pio_pull_up(BUT_PIO,BUT_PIO_IDX_MASK,1);
-	pio_pull_up(BUT1_PIO,BUT1_PIO_IDX_MASK,1);
-	pio_pull_up(BUT2_PIO,BUT2_PIO_IDX_MASK,1);
-	pio_pull_up(BUT3_PIO,BUT3_PIO_IDX_MASK,1);
 
 	
 	
@@ -161,59 +255,59 @@ int main(void)
   // aplicacoes embarcadas não devem sair do while(1).
   while (1)
   {
-	  char button_pressed = !pio_get(BUT_PIO,PIO_INPUT,BUT_PIO_IDX_MASK) ;
-	  char button1_pressed = !pio_get(BUT1_PIO,PIO_INPUT,BUT1_PIO_IDX_MASK) ;
-	  char button2_pressed = !pio_get(BUT2_PIO,PIO_INPUT,BUT2_PIO_IDX_MASK) ;
-	  char button3_pressed = !pio_get(BUT3_PIO,PIO_INPUT,BUT3_PIO_IDX_MASK) ;
+	  char button_pressed = !_pio_get(BUT_PIO,PIO_INPUT,BUT_PIO_IDX_MASK) ;
+	  char button1_pressed = !_pio_get(BUT1_PIO,PIO_INPUT,BUT1_PIO_IDX_MASK) ;
+	  char button2_pressed = !_pio_get(BUT2_PIO,PIO_INPUT,BUT2_PIO_IDX_MASK) ;
+	  char button3_pressed = !_pio_get(BUT3_PIO,PIO_INPUT,BUT3_PIO_IDX_MASK) ;
 	  
 	  int n = 0; 
 	  int n1 = 0;
 	  int n2 = 0;
 	  int n3 = 0;
 	  
-	  pio_set(PIOC,LED2_PIO_IDX_MASK);
-	  pio_set(PIOC,LED_PIO_IDX_MASK);
-	  pio_set(PIOA,LED1_PIO_IDX_MASK);
-	  pio_set(PIOB,LED3_PIO_IDX_MASK);
+	  _pio_set(PIOC,LED2_PIO_IDX_MASK);
+	  _pio_set(PIOC,LED_PIO_IDX_MASK);
+	  _pio_set(PIOA,LED1_PIO_IDX_MASK);
+	  _pio_set(PIOB,LED3_PIO_IDX_MASK);
 	  
 	  // botao-led principal
 	  
 	  while (n <10 && button_pressed) {
-	  pio_set(PIOC, LED_PIO_IDX_MASK);      // Coloca 1 no pino LED
+	  _pio_set(PIOC, LED_PIO_IDX_MASK);      // Coloca 1 no pino LED
 	  delay_ms(1000);                        // Delay por software de 200 ms
-	  pio_clear(PIOC, LED_PIO_IDX_MASK);    // Coloca 0 no pino do LED
+	  _pio_clear(PIOC, LED_PIO_IDX_MASK);    // Coloca 0 no pino do LED
 	  n++;
-	  delay_ms(1000);                        // Delay por software de 200 ms
+	  _delay_ms(1000);                        // Delay por software de 200 ms
 	  }
 	  
 	  //botao-led 1
 	  
 	  while (n1 <10 && button1_pressed) {
-		  pio_clear(PIOA, LED1_PIO_IDX_MASK);      // Coloca 1 no pino LED
+		  _pio_clear(PIOA, LED1_PIO_IDX_MASK);      // Coloca 1 no pino LED
 		  delay_ms(1000);                        // Delay por software de 200 ms
-		  pio_set(PIOA, LED1_PIO_IDX_MASK);    // Coloca 0 no pino do LED
+		  _pio_set(PIOA, LED1_PIO_IDX_MASK);    // Coloca 0 no pino do LED
 		  n1++;
-		  delay_ms(1000);                        // Delay por software de 200 ms
+		  _delay_ms(1000);                        // Delay por software de 200 ms
 	  }
 	  
 	  //botao-led 2
 	  
 	  while (n2 <10 && button2_pressed) {
-		  pio_clear(PIOC, LED2_PIO_IDX_MASK);      // Coloca 1 no pino LED
-		  delay_ms(1000);                        // Delay por software de 200 ms
-		  pio_set(PIOC, LED2_PIO_IDX_MASK);    // Coloca 0 no pino do LED
+		  _pio_clear(PIOC, LED2_PIO_IDX_MASK);      // Coloca 1 no pino LED
+		  _delay_ms(1000);                        // Delay por software de 200 ms
+		  _pio_set(PIOC, LED2_PIO_IDX_MASK);    // Coloca 0 no pino do LED
 		  n2++;
-		  delay_ms(1000);                        // Delay por software de 200 ms
+		  _delay_ms(1000);                        // Delay por software de 200 ms
 	  }
 	  
 	  //botao-led 3
 	  
 	  while (n3 <10 && button3_pressed) {
-		  pio_clear(PIOB, LED3_PIO_IDX_MASK);      // Coloca 1 no pino LED
-		  delay_ms(1000);                        // Delay por software de 200 ms
-		  pio_set(PIOB, LED3_PIO_IDX_MASK);    // Coloca 0 no pino do LED
+		  _pio_clear(PIOB, LED3_PIO_IDX_MASK);      // Coloca 1 no pino LED
+		  _delay_ms(1000);                        // Delay por software de 200 ms
+		  _pio_set(PIOB, LED3_PIO_IDX_MASK);    // Coloca 0 no pino do LED
 		  n3++;
-		  delay_ms(1000);                        // Delay por software de 200 ms
+		  _delay_ms(1000);                        // Delay por software de 200 ms
 	  }
   }
   return 0;
