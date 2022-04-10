@@ -7,6 +7,9 @@
 #define TEMPO_MINIMO 58*1e-6
 #define TEMPO_MAXIMO 11764*1e-6
 #define VELOCIDADE_TEMPO 340 
+#define MAX_HEIGHT_LCD 32
+#define MAX_LENGTH_LCD 120
+
 
 typedef struct  {
 	uint32_t year;
@@ -263,6 +266,8 @@ static void RTT_init(float freqPrescale, uint32_t IrqNPulses, uint32_t rttIRQSou
 
 
 
+
+
 // Inicialização dos leds
 
 void io_init(void)
@@ -318,6 +323,38 @@ void io_init(void)
 
 }
 
+int calculate_graphic (float measure) {
+	
+	int bar_raw = 20 - ( (int) measure*MAX_HEIGHT_LCD)/400  ;
+	
+	if (bar_raw < 0) {
+		bar_raw = 4;
+		
+	}
+	
+	else {
+		bar_raw = abs(bar_raw) + 2;
+	}
+	
+	return bar_raw;
+}
+
+void draw_graphic(float measure[]) {
+	
+	int bar_raw_0 = calculate_graphic(measure[0]);
+	int bar_raw_1 = calculate_graphic(measure[1]);
+	int bar_raw_2 = calculate_graphic(measure[2]);
+	int bar_raw_3 = calculate_graphic(measure[3]);
+	
+	
+	
+	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 0*10,bar_raw_0,&sysfont);
+	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 1*10,bar_raw_1,&sysfont);
+	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 2*10,bar_raw_2,&sysfont);
+	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 3*10,bar_raw_3,&sysfont);
+	
+	};
+
 int main (void)
 {
 	board_init();
@@ -332,12 +369,16 @@ int main (void)
 	gfx_mono_ssd1306_init();
 	gfx_mono_draw_string("Let´s measure", 0,16, &sysfont);
 	
+	
   char dist_str[64];
   
   int ticks = 0;
   float time = 0.0;
   char oled_print = 0;
   char undefined_time = 1;
+  
+  float measurements[] = {0,0,0,0};
+  char i = 0;
   
   TC_init(TC0, ID_TC1,1,1);
   
@@ -384,8 +425,15 @@ int main (void)
 					gfx_mono_draw_string("OUT OF RANGE", 0,16, &sysfont);
 				}
 				else {
-					sprintf(dist_str,"%0.2lf cm",dist_met);
+					
+					if (i > 4) {i = 0;}
+					sprintf(dist_str,"%0.1lf",dist_met);
+					gfx_mono_draw_string("[cm]", 0,0, &sysfont);
 					gfx_mono_draw_string(dist_str, 0,16, &sysfont);
+					measurements[i] = dist_met;
+					draw_graphic(measurements);
+					i++;
+					
 				}
 				
 				oled_print = 0;
