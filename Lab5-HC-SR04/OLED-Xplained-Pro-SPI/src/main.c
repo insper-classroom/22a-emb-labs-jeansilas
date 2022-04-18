@@ -347,7 +347,6 @@ void draw_graphic(float measure[]) {
 	int bar_raw_3 = calculate_graphic(measure[3]);
 	
 	
-	
 	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 0*10,bar_raw_0,&sysfont);
 	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 1*10,bar_raw_1,&sysfont);
 	gfx_mono_draw_string("_",  (int) 2* MAX_LENGTH_LCD/3 + 2*10,bar_raw_2,&sysfont);
