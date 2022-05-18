@@ -204,7 +204,7 @@ int main(void) {
 		printf("Failed to create lcd task\r\n");
 	}
 	
-	xSemaphoreCreateMutex();
+	xMutexLVGL = xSemaphoreCreateMutex();
 	
 	/* Start the scheduler. */
 	vTaskStartScheduler();
